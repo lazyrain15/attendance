@@ -4,6 +4,7 @@ import os
 import sys
 import mysql.connector
 from tkinter import *
+import pusher
 
 # Connect to Database
 db = mysql.connector.connect(
@@ -15,6 +16,7 @@ db = mysql.connector.connect(
 
 
 def saveData(user_id, timestamp, status, punch):
+    print(f'Save to database : {user_id}, {timestamp}, {status}, {punch}')
     cursor = db.cursor()
     sql = "INSERT INTO data_attendance (userId, dateTime, status, type) VALUES (%s, %s, %s, %s)"
     val = (user_id, timestamp, status, punch)
@@ -150,6 +152,9 @@ try:
             status = dataString[(y + 1):z]
             fingerType = dataString[(z + 2):a]
 
+            id_user = userId
+            type_finger = fingerType
+
             print('UserID : ' + userId + ' DateTime : ' +
                   dateTime + ' Status : ' + status + ' Type : ' + fingerType)
             textMssg = f"UserID :  {userId} Type :  {('Masuk' if fingerType == '0' else 'Pulang')} DateTime :  {dateTime}"
@@ -161,13 +166,22 @@ try:
             sql = f"SELECT karyawan.nama_karyawan FROM karyawan WHERE karyawan.id_karyawan = '{userId}' ORDER BY id_karyawan DESC LIMIT 1"
             cursor.execute(sql)
             myresult = cursor.fetchall()
-            print(dateTime)
             namaKaryawan = myresult[0][0]
 
             runView(f'{userId}', f'{namaKaryawan}',
                     f'{typeFinger}', f'{dateTime}', 3)
             showMessage(textMssg, 'info', 100)
-            saveData(userId, dateTime, status, fingerType)
+            saveData(f'{id_user}', dateTime, status, f'{type_finger}')
+            pusher_client = pusher.Pusher(
+                app_id='1534829',
+                key='c1aab25b6c16372d51d5',
+                secret='b8b64e05e62524f0a07d',
+                cluster='ap1',
+                ssl=True
+            )
+
+            pusher_client.trigger('attendance', 'userFinger',
+                                  {'message': 'finger update'})
         i += 1
 except Exception as e:
     print("Process terminate : {}".format(e))
